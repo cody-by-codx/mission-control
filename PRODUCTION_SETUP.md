@@ -86,7 +86,7 @@ Variables in `.env.local`:
 ```bash
 WORKSPACE_BASE_PATH=~/Documents/Shared
 PROJECTS_PATH=~/Documents/Shared/projects
-MISSION_CONTROL_URL=http://192.168.1.100:3000
+MISSION_CONTROL_URL=http://your-server-ip:3000
 OPENCLAW_GATEWAY_URL=ws://127.0.0.1:18789
 ```
 

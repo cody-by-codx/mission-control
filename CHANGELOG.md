@@ -39,7 +39,7 @@ All notable changes to Mission Control will be documented in this file.
 
 ### Changed
 - All hardcoded paths removed (previously: `/Users/charlie`, `${HOME}`)
-- All hardcoded IPs removed (previously: `YOUR_SERVER_IP`)
+- All hardcoded IPs removed (previously: `localhost`)
 - `charlie-orchestration.ts` now uses config system
 - Task API routes broadcast full task objects with joins
 - `.env.example` expanded with all configuration options
