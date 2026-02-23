@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { X, Save, Trash2, Activity, Package, Bot, ClipboardList, Plus, DollarSign } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import { triggerAutoDispatch, shouldTriggerAutoDispatch } from '@/lib/auto-dispatch';
 import { ActivityLog } from './ActivityLog';
@@ -40,6 +40,20 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
     assigned_agent_id: task?.assigned_agent_id || '',
     due_date: task?.due_date || '',
   });
+
+  // Task 3.8: Fetch estimated cost for existing tasks
+  const [taskCost, setTaskCost] = useState<{ total_cost: number; total_tokens: number } | null>(null);
+  useEffect(() => {
+    if (!task?.id) return;
+    fetch(`/api/metrics/overview?task_id=${task.id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) {
+          setTaskCost({ total_cost: data.total_cost || 0, total_tokens: data.total_tokens || 0 });
+        }
+      })
+      .catch(() => {});
+  }, [task?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -313,6 +327,24 @@ export function TaskModal({ task, onClose, workspaceId }: TaskModalProps) {
               className="w-full bg-mc-bg border border-mc-border rounded px-3 py-2 text-sm focus:outline-none focus:border-mc-accent"
             />
           </div>
+
+          {/* Task 3.8: Estimated Cost */}
+          {task && taskCost && (taskCost.total_cost > 0 || taskCost.total_tokens > 0) && (
+            <div className="p-3 bg-mc-bg rounded-lg border border-mc-border">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="w-4 h-4 text-mc-accent-green" />
+                <span className="text-sm font-medium">Estimated Cost</span>
+              </div>
+              <div className="flex items-center gap-4 text-xs text-mc-text-secondary">
+                <span>
+                  Cost: <span className="text-mc-accent-green font-medium">${taskCost.total_cost.toFixed(4)}</span>
+                </span>
+                <span>
+                  Tokens: <span className="text-mc-text font-medium">{taskCost.total_tokens.toLocaleString()}</span>
+                </span>
+              </div>
+            </div>
+          )}
             </form>
           )}
 

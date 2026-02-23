@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, ChevronRight, ChevronLeft, Zap, ZapOff, Loader2, Search } from 'lucide-react';
+import { Plus, ChevronRight, ChevronLeft, Zap, ZapOff, Loader2, Search, DollarSign } from 'lucide-react';
 import { useMissionControl } from '@/lib/store';
 import type { Agent, AgentStatus, OpenClawSession } from '@/lib/types';
 import { AgentModal } from './AgentModal';
@@ -22,6 +22,7 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
   const [connectingAgentId, setConnectingAgentId] = useState<string | null>(null);
   const [activeSubAgents, setActiveSubAgents] = useState(0);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [agentCosts, setAgentCosts] = useState<Record<string, number>>({});
 
   const toggleMinimize = () => setIsMinimized(!isMinimized);
 
@@ -66,6 +67,30 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
 
     // Poll every 30 seconds (reduced from 10s to reduce load)
     const interval = setInterval(loadSubAgentCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Task 3.9: Load agent costs
+  useEffect(() => {
+    const loadAgentCosts = async () => {
+      try {
+        const res = await fetch('/api/metrics/agents');
+        if (res.ok) {
+          const data = await res.json();
+          const costs: Record<string, number> = {};
+          for (const item of data) {
+            if (item.agent_id && item.total_cost !== undefined) {
+              costs[item.agent_id] = item.total_cost;
+            }
+          }
+          setAgentCosts(costs);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    loadAgentCosts();
+    const interval = setInterval(loadAgentCosts, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -261,14 +286,22 @@ export function AgentsSidebar({ workspaceId }: AgentsSidebarProps) {
                   </div>
                 </div>
 
-                {/* Status */}
-                <span
-                  className={`text-xs px-2 py-0.5 rounded uppercase ${getStatusBadge(
-                    agent.status
-                  )}`}
-                >
-                  {agent.status}
-                </span>
+                {/* Status + Cost Badge */}
+                <div className="flex flex-col items-end gap-0.5">
+                  <span
+                    className={`text-xs px-2 py-0.5 rounded uppercase ${getStatusBadge(
+                      agent.status
+                    )}`}
+                  >
+                    {agent.status}
+                  </span>
+                  {agentCosts[agent.id] > 0 && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-mc-accent-green" title="Total cost">
+                      <DollarSign className="w-2.5 h-2.5" />
+                      {agentCosts[agent.id].toFixed(2)}
+                    </span>
+                  )}
+                </div>
               </button>
 
               {/* OpenClaw Connect Button - show for master agents */}
