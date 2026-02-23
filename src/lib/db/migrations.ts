@@ -202,6 +202,134 @@ const migrations: Migration[] = [
         console.log('[Migration 007] Added gateway_agent_id to agents');
       }
     }
+  },
+  {
+    id: '008',
+    name: 'add_task_dependencies',
+    up: (db) => {
+      console.log('[Migration 008] Creating task_dependencies table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS task_dependencies (
+          id TEXT PRIMARY KEY,
+          source_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          target_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+          dependency_type TEXT DEFAULT 'blocks' CHECK (dependency_type IN ('blocks', 'relates_to', 'subtask_of')),
+          created_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(source_task_id, target_task_id)
+        );
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_deps_source ON task_dependencies(source_task_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_task_deps_target ON task_dependencies(target_task_id)`);
+    }
+  },
+  {
+    id: '009',
+    name: 'add_graph_node_positions',
+    up: (db) => {
+      console.log('[Migration 009] Creating graph_node_positions table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS graph_node_positions (
+          id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+          node_type TEXT NOT NULL CHECK (node_type IN ('agent', 'task', 'group')),
+          node_id TEXT NOT NULL,
+          x REAL NOT NULL DEFAULT 0,
+          y REAL NOT NULL DEFAULT 0,
+          pinned INTEGER DEFAULT 0,
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(workspace_id, node_type, node_id)
+        );
+      `);
+    }
+  },
+  {
+    id: '010',
+    name: 'add_token_usage_and_metrics',
+    up: (db) => {
+      console.log('[Migration 010] Creating token_usage, model_pricing, daily_metrics tables...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS token_usage (
+          id TEXT PRIMARY KEY,
+          agent_id TEXT NOT NULL REFERENCES agents(id),
+          task_id TEXT REFERENCES tasks(id),
+          session_id TEXT,
+          model TEXT NOT NULL,
+          input_tokens INTEGER NOT NULL DEFAULT 0,
+          output_tokens INTEGER NOT NULL DEFAULT 0,
+          total_tokens INTEGER GENERATED ALWAYS AS (input_tokens + output_tokens) STORED,
+          cost_usd REAL NOT NULL DEFAULT 0.0,
+          operation TEXT NOT NULL CHECK (operation IN ('planning', 'execution', 'review', 'subagent', 'conversation')),
+          metadata TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_token_usage_agent ON token_usage(agent_id, created_at DESC)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_token_usage_task ON token_usage(task_id)`);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_token_usage_date ON token_usage(created_at)`);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS model_pricing (
+          id TEXT PRIMARY KEY,
+          model_name TEXT NOT NULL UNIQUE,
+          input_price_per_1k REAL NOT NULL,
+          output_price_per_1k REAL NOT NULL,
+          provider TEXT NOT NULL DEFAULT 'anthropic',
+          updated_at TEXT DEFAULT (datetime('now'))
+        );
+      `);
+
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS daily_metrics (
+          id TEXT PRIMARY KEY,
+          date TEXT NOT NULL,
+          agent_id TEXT REFERENCES agents(id),
+          workspace_id TEXT REFERENCES workspaces(id),
+          total_tokens INTEGER DEFAULT 0,
+          total_cost_usd REAL DEFAULT 0.0,
+          tasks_completed INTEGER DEFAULT 0,
+          avg_task_duration_ms INTEGER DEFAULT 0,
+          error_count INTEGER DEFAULT 0,
+          UNIQUE(date, agent_id)
+        );
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_daily_metrics_date ON daily_metrics(date DESC, agent_id)`);
+
+      // Seed model_pricing with current prices
+      const seedPricing = db.prepare(`
+        INSERT OR IGNORE INTO model_pricing (id, model_name, input_price_per_1k, output_price_per_1k, provider)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      seedPricing.run('price-opus-4-6', 'claude-opus-4-6', 0.015, 0.075, 'anthropic');
+      seedPricing.run('price-sonnet-4-6', 'claude-sonnet-4-6', 0.003, 0.015, 'anthropic');
+      seedPricing.run('price-haiku-4-5', 'claude-haiku-4-5', 0.0008, 0.004, 'anthropic');
+      seedPricing.run('price-gpt-4o', 'gpt-4o', 0.0025, 0.01, 'openai');
+      seedPricing.run('price-gpt-4o-mini', 'gpt-4o-mini', 0.00015, 0.0006, 'openai');
+      console.log('[Migration 010] Seeded model_pricing with 5 models');
+    }
+  },
+  {
+    id: '011',
+    name: 'add_parent_task_id',
+    up: (db) => {
+      console.log('[Migration 011] Adding parent_task_id to tasks...');
+      const tasksInfo = db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[];
+      if (!tasksInfo.some(col => col.name === 'parent_task_id')) {
+        db.exec(`ALTER TABLE tasks ADD COLUMN parent_task_id TEXT REFERENCES tasks(id)`);
+        console.log('[Migration 011] Added parent_task_id to tasks');
+      }
+    }
+  },
+  {
+    id: '012',
+    name: 'add_agent_group_label',
+    up: (db) => {
+      console.log('[Migration 012] Adding group_label to agents...');
+      const agentsInfo = db.prepare("PRAGMA table_info(agents)").all() as { name: string }[];
+      if (!agentsInfo.some(col => col.name === 'group_label')) {
+        db.exec(`ALTER TABLE agents ADD COLUMN group_label TEXT`);
+        console.log('[Migration 012] Added group_label to agents');
+      }
+    }
   }
 ];
 

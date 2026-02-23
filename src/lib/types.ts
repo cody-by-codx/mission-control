@@ -37,6 +37,7 @@ export interface Agent {
   model?: string;
   source: AgentSource;
   gateway_agent_id?: string;
+  group_label?: string;
   created_at: string;
   updated_at: string;
 }
@@ -64,6 +65,7 @@ export interface Task {
   workspace_id: string;
   business_id: string;
   due_date?: string;
+  parent_task_id?: string | null;
   created_at: string;
   updated_at: string;
   // Joined fields
@@ -309,17 +311,92 @@ export type SSEEventType =
   | 'activity_logged'
   | 'deliverable_added'
   | 'agent_spawned'
-  | 'agent_completed';
+  | 'agent_completed'
+  // Graph-specific events
+  | 'agent_status_changed'
+  | 'task_assigned'
+  | 'task_unassigned'
+  | 'subagent_spawned'
+  | 'subagent_completed'
+  | 'dependency_created'
+  | 'dependency_removed'
+  | 'node_position_updated';
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | TaskActivity | TaskDeliverable | {
+  payload: Task | TaskActivity | TaskDeliverable | TaskDependency | GraphNodePosition | {
     taskId: string;
     sessionId: string;
     agentName?: string;
     summary?: string;
     deleted?: boolean;
   } | {
-    id: string;  // For task_deleted events
+    id: string;  // For task_deleted / dependency_removed events
+  } | {
+    agentId: string;
+    status: AgentStatus;
   };
+}
+
+// === Graph & Dependency Types ===
+
+export type DependencyType = 'blocks' | 'relates_to' | 'subtask_of';
+
+export interface TaskDependency {
+  id: string;
+  source_task_id: string;
+  target_task_id: string;
+  dependency_type: DependencyType;
+  created_at: string;
+}
+
+export interface GraphNodePosition {
+  id: string;
+  workspace_id: string;
+  node_type: 'agent' | 'task' | 'group';
+  node_id: string;
+  x: number;
+  y: number;
+  pinned: boolean;
+  updated_at: string;
+}
+
+// === Token Usage & Metrics Types ===
+
+export type TokenOperation = 'planning' | 'execution' | 'review' | 'subagent' | 'conversation';
+
+export interface TokenUsage {
+  id: string;
+  agent_id: string;
+  task_id?: string;
+  session_id?: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  operation: TokenOperation;
+  metadata?: string;
+  created_at: string;
+}
+
+export interface ModelPricing {
+  id: string;
+  model_name: string;
+  input_price_per_1k: number;
+  output_price_per_1k: number;
+  provider: string;
+  updated_at: string;
+}
+
+export interface DailyMetric {
+  id: string;
+  date: string;
+  agent_id?: string;
+  workspace_id?: string;
+  total_tokens: number;
+  total_cost_usd: number;
+  tasks_completed: number;
+  avg_task_duration_ms: number;
+  error_count: number;
 }

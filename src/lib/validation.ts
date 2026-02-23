@@ -62,8 +62,36 @@ export const CreateDeliverableSchema = z.object({
   description: z.string().optional(),
 });
 
+// Task dependency schemas
+const DependencyTypeEnum = z.enum(['blocks', 'relates_to', 'subtask_of']);
+
+export const CreateDependencySchema = z.object({
+  source_task_id: z.string().min(1, 'Source task ID is required'),
+  target_task_id: z.string().min(1, 'Target task ID is required'),
+  dependency_type: DependencyTypeEnum.optional().default('blocks'),
+});
+
+// Graph node position schemas
+const NodeTypeEnum = z.enum(['agent', 'task', 'group']);
+
+export const UpdatePositionSchema = z.object({
+  workspace_id: z.string().min(1),
+  node_type: NodeTypeEnum,
+  node_id: z.string().min(1),
+  x: z.number(),
+  y: z.number(),
+  pinned: z.boolean().optional().default(false),
+});
+
+export const BatchUpdatePositionsSchema = z.object({
+  positions: z.array(UpdatePositionSchema).min(1).max(500),
+});
+
 // Type exports for use in routes
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
 export type CreateActivityInput = z.infer<typeof CreateActivitySchema>;
 export type CreateDeliverableInput = z.infer<typeof CreateDeliverableSchema>;
+export type CreateDependencyInput = z.infer<typeof CreateDependencySchema>;
+export type UpdatePositionInput = z.infer<typeof UpdatePositionSchema>;
+export type BatchUpdatePositionsInput = z.infer<typeof BatchUpdatePositionsSchema>;
