@@ -1,31 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-import logger from '@/lib/logger';
 
 // Log warning at startup if auth is disabled
 const MC_API_TOKEN = process.env.MC_API_TOKEN;
 if (!MC_API_TOKEN) {
-  logger.warn('MC_API_TOKEN not set - API authentication is DISABLED (local dev mode)');
+  console.warn('[SECURITY] MC_API_TOKEN not set - API authentication is DISABLED (local dev mode)');
+}
+
+// --- Rate limiting (in-memory, per-IP) ---
+const RATE_LIMIT = parseInt(process.env.RATE_LIMIT_RPM || '120', 10); // requests per minute
+const RATE_WINDOW_MS = 60_000;
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(ip: string): { allowed: boolean; remaining: number; resetAt: number } {
+  const now = Date.now();
+  const entry = rateLimitStore.get(ip);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return { allowed: true, remaining: RATE_LIMIT - 1, resetAt: now + RATE_WINDOW_MS };
+  }
+
+  entry.count++;
+  const allowed = entry.count <= RATE_LIMIT;
+  return { allowed, remaining: Math.max(0, RATE_LIMIT - entry.count), resetAt: entry.resetAt };
+}
+
+function getClientIp(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return request.headers.get('x-real-ip') || request.ip || 'unknown';
+}
+
+// Periodic cleanup of expired entries (every 2 minutes)
+let lastCleanup = Date.now();
+function maybeCleanup() {
+  const now = Date.now();
+  if (now - lastCleanup < 120_000) return;
+  lastCleanup = now;
+  for (const [key, entry] of rateLimitStore) {
+    if (now > entry.resetAt) rateLimitStore.delete(key);
+  }
 }
 
 /**
  * Check if a request originates from the same host (browser UI).
- * Same-origin browser requests include a Referer or Origin header
- * pointing to the MC server itself. Server-side render fetches
- * (Next.js RSC) come from the same process and have no Origin.
  */
 function isSameOriginRequest(request: NextRequest): boolean {
   const host = request.headers.get('host');
   if (!host) return false;
 
-  // Server-side fetches from Next.js (no origin/referer) — same process
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
 
-  // If neither origin nor referer is set, this is likely a server-side
-  // fetch or a direct curl. Require auth for these (external API calls).
   if (!origin && !referer) return false;
 
-  // Check if Origin matches the host
   if (origin) {
     try {
       const originUrl = new URL(origin);
@@ -35,7 +63,6 @@ function isSameOriginRequest(request: NextRequest): boolean {
     }
   }
 
-  // Check if Referer matches the host
   if (referer) {
     try {
       const refererUrl = new URL(referer);
@@ -51,7 +78,7 @@ function isSameOriginRequest(request: NextRequest): boolean {
 // Demo mode — read-only, blocks all mutations
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 if (DEMO_MODE) {
-  logger.info('Running in demo mode — all write operations are blocked');
+  console.log('[DEMO] Running in demo mode — all write operations are blocked');
 }
 
 export function middleware(request: NextRequest) {
@@ -59,13 +86,34 @@ export function middleware(request: NextRequest) {
 
   // Only protect /api/* routes
   if (!pathname.startsWith('/api/')) {
-    // Add demo mode header for UI detection
     if (DEMO_MODE) {
       const response = NextResponse.next();
       response.headers.set('X-Demo-Mode', 'true');
       return response;
     }
     return NextResponse.next();
+  }
+
+  // Skip rate limiting for health checks
+  if (pathname === '/api/health') {
+    return NextResponse.next();
+  }
+
+  // Rate limiting
+  maybeCleanup();
+  const ip = getClientIp(request);
+  const rl = checkRateLimit(ip);
+
+  if (!rl.allowed) {
+    const response = NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      { status: 429 }
+    );
+    response.headers.set('X-RateLimit-Limit', String(RATE_LIMIT));
+    response.headers.set('X-RateLimit-Remaining', '0');
+    response.headers.set('X-RateLimit-Reset', String(Math.ceil(rl.resetAt / 1000)));
+    response.headers.set('Retry-After', String(Math.ceil((rl.resetAt - Date.now()) / 1000)));
+    return response;
   }
 
   // Demo mode: block all write operations
@@ -77,17 +125,23 @@ export function middleware(request: NextRequest) {
         { status: 403 }
       );
     }
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('X-RateLimit-Remaining', String(rl.remaining));
+    return response;
   }
 
   // If MC_API_TOKEN is not set, auth is disabled (dev mode)
   if (!MC_API_TOKEN) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('X-RateLimit-Remaining', String(rl.remaining));
+    return response;
   }
 
   // Allow same-origin browser requests (UI fetching its own API)
   if (isSameOriginRequest(request)) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    response.headers.set('X-RateLimit-Remaining', String(rl.remaining));
+    return response;
   }
 
   // Special case: /api/events/stream (SSE) - allow token as query param
@@ -96,12 +150,11 @@ export function middleware(request: NextRequest) {
     if (queryToken && queryToken === MC_API_TOKEN) {
       return NextResponse.next();
     }
-    // Fall through to header check below
   }
 
   // Check Authorization header for bearer token
   const authHeader = request.headers.get('authorization');
-  
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -109,8 +162,8 @@ export function middleware(request: NextRequest) {
     );
   }
 
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  
+  const token = authHeader.substring(7);
+
   if (token !== MC_API_TOKEN) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -118,9 +171,11 @@ export function middleware(request: NextRequest) {
     );
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  response.headers.set('X-RateLimit-Remaining', String(rl.remaining));
+  return response;
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/api/:path*'],
 };
