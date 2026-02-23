@@ -1,12 +1,18 @@
 /**
  * Server-Sent Events (SSE) broadcaster for real-time updates
  * Manages client connections and broadcasts events to all listeners
+ * Supports event batching with configurable window (default 100ms)
  */
 
 import type { SSEEvent } from './types';
 
 // Store active SSE client connections
 const clients = new Set<ReadableStreamDefaultController>();
+
+// Batching state
+const BATCH_WINDOW_MS = 100;
+let batchBuffer: SSEEvent[] = [];
+let batchTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Register a new SSE client connection
@@ -23,26 +29,60 @@ export function unregisterClient(controller: ReadableStreamDefaultController): v
 }
 
 /**
- * Broadcast an event to all connected SSE clients
+ * Flush the current batch buffer to all connected clients
  */
-export function broadcast(event: SSEEvent): void {
+function flushBatch(): void {
+  if (batchBuffer.length === 0) return;
+
   const encoder = new TextEncoder();
-  const data = `data: ${JSON.stringify(event)}\n\n`;
+  const eventsToSend = batchBuffer;
+  batchBuffer = [];
+  batchTimer = null;
+
+  // Send batch as array if multiple events, single object if one
+  const payload = eventsToSend.length === 1
+    ? JSON.stringify(eventsToSend[0])
+    : JSON.stringify({ type: 'batch', payload: eventsToSend });
+
+  const data = `data: ${payload}\n\n`;
   const encoded = encoder.encode(data);
 
-  // Send to all connected clients
   const clientsArray = Array.from(clients);
   for (const client of clientsArray) {
     try {
       client.enqueue(encoded);
     } catch (error) {
-      // Client disconnected, remove it
       console.error('Failed to send SSE event to client:', error);
       clients.delete(client);
     }
   }
 
-  console.log(`[SSE] Broadcast ${event.type} to ${clients.size} client(s)`);
+  console.log(`[SSE] Broadcast ${eventsToSend.length} event(s) to ${clients.size} client(s)`);
+}
+
+/**
+ * Broadcast an event to all connected SSE clients
+ * Events are batched in a 100ms window for efficiency
+ */
+export function broadcast(event: SSEEvent): void {
+  batchBuffer.push(event);
+
+  if (!batchTimer) {
+    batchTimer = setTimeout(flushBatch, BATCH_WINDOW_MS);
+  }
+}
+
+/**
+ * Broadcast an event immediately without batching (for critical events)
+ */
+export function broadcastImmediate(event: SSEEvent): void {
+  // Flush any pending batch first
+  if (batchTimer) {
+    clearTimeout(batchTimer);
+    batchTimer = null;
+  }
+  batchBuffer.push(event);
+  flushBatch();
 }
 
 /**

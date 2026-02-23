@@ -330,6 +330,27 @@ const migrations: Migration[] = [
         console.log('[Migration 012] Added group_label to agents');
       }
     }
+  },
+  {
+    id: '013',
+    name: 'add_cost_alert_configs',
+    up: (db) => {
+      console.log('[Migration 013] Creating cost_alert_configs table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS cost_alert_configs (
+          id TEXT PRIMARY KEY,
+          entity_type TEXT NOT NULL CHECK (entity_type IN ('agent', 'workspace')),
+          entity_id TEXT NOT NULL,
+          threshold_usd REAL NOT NULL,
+          period TEXT DEFAULT 'daily' CHECK (period IN ('daily', 'weekly', 'monthly')),
+          enabled INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE(entity_type, entity_id, period)
+        );
+      `);
+      db.exec(`CREATE INDEX IF NOT EXISTS idx_cost_alerts_entity ON cost_alert_configs(entity_type, entity_id)`);
+    }
   }
 ];
 

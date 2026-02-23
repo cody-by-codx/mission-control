@@ -320,22 +320,60 @@ export type SSEEventType =
   | 'subagent_completed'
   | 'dependency_created'
   | 'dependency_removed'
-  | 'node_position_updated';
+  | 'node_position_updated'
+  // Metrics events
+  | 'metrics_updated'
+  | 'cost_alert'
+  // Batch wrapper
+  | 'batch';
+
+export interface MetricsUpdatePayload {
+  agentId?: string;
+  workspaceId?: string;
+  totalCost: number;
+  totalTokens: number;
+  period: string;
+}
+
+export interface CostAlertPayload {
+  alertId: string;
+  alertType: 'agent_threshold' | 'workspace_threshold';
+  entityId: string;
+  entityName: string;
+  currentCost: number;
+  threshold: number;
+  period: string;
+  message: string;
+  triggered_at: string;
+}
+
+export interface CostAlertConfig {
+  id: string;
+  entity_type: 'agent' | 'workspace';
+  entity_id: string;
+  threshold_usd: number;
+  period: 'daily' | 'weekly' | 'monthly';
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface SSEEvent {
   type: SSEEventType;
-  payload: Task | TaskActivity | TaskDeliverable | TaskDependency | GraphNodePosition | {
+  payload: Task | TaskActivity | TaskDeliverable | TaskDependency | GraphNodePosition
+    | MetricsUpdatePayload | CostAlertPayload
+    | {
     taskId: string;
     sessionId: string;
     agentName?: string;
     summary?: string;
     deleted?: boolean;
   } | {
-    id: string;  // For task_deleted / dependency_removed events
+    id: string;
   } | {
     agentId: string;
     status: AgentStatus;
-  };
+  } | SSEEvent[]; // for batch
 }
 
 // === Graph & Dependency Types ===
