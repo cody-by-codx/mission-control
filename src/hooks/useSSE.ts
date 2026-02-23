@@ -59,7 +59,14 @@ export function useSSE() {
             return;
           }
 
-          const sseEvent: SSEEvent = JSON.parse(event.data);
+          const parsed = JSON.parse(event.data);
+
+          // Handle batched events
+          const events: SSEEvent[] = parsed.type === 'batch'
+            ? (parsed.payload as SSEEvent[])
+            : [parsed as SSEEvent];
+
+          for (const sseEvent of events) {
           debug.sse(`Received event: ${sseEvent.type}`, sseEvent.payload);
 
           switch (sseEvent.type) {
@@ -138,9 +145,20 @@ export function useSSE() {
               debug.sse('Node position updated (graph)', sseEvent.payload);
               break;
 
+            case 'metrics_updated':
+              debug.sse('Metrics updated', sseEvent.payload);
+              break;
+
+            case 'cost_alert':
+              debug.sse('Cost alert triggered', sseEvent.payload);
+              // Dispatch custom event for cost alert UI
+              window.dispatchEvent(new CustomEvent('cost_alert', { detail: sseEvent.payload }));
+              break;
+
             default:
               debug.sse('Unknown event type', sseEvent);
           }
+          } // end for-loop over batch
         } catch (error) {
           console.error('[SSE] Error parsing event:', error);
         }
