@@ -9,6 +9,8 @@ import {
   useEdgesState,
   useReactFlow,
   ReactFlowProvider,
+  type Node,
+  type Edge,
   type NodeMouseHandler,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -71,8 +73,8 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
     sessions: agentOpenClawSessions as Record<string, OpenClawSession | null>,
   });
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState([] as Node[]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([] as Edge[]);
 
   // Apply auto-layout when graph data changes
   const doAutoLayout = useCallback(() => {
@@ -95,7 +97,7 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
     const newNodeIds = new Set(graphNodes.map(n => n.id));
     const structureChanged =
       currentNodeIds.size !== newNodeIds.size ||
-      [...newNodeIds].some(id => !currentNodeIds.has(id));
+      Array.from(newNodeIds).some(id => !currentNodeIds.has(id));
 
     if (!layoutApplied || structureChanged) {
       doAutoLayout();
