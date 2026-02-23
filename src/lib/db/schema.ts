@@ -236,6 +236,19 @@ CREATE TABLE IF NOT EXISTS daily_metrics (
   UNIQUE(date, agent_id)
 );
 
+-- Cost alert configurations
+CREATE TABLE IF NOT EXISTS cost_alert_configs (
+  id TEXT PRIMARY KEY,
+  entity_type TEXT NOT NULL CHECK (entity_type IN ('agent', 'workspace')),
+  entity_id TEXT NOT NULL,
+  threshold_usd REAL NOT NULL,
+  period TEXT DEFAULT 'daily' CHECK (period IN ('daily', 'weekly', 'monthly')),
+  enabled INTEGER DEFAULT 1,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(entity_type, entity_id, period)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
@@ -254,4 +267,5 @@ CREATE INDEX IF NOT EXISTS idx_token_usage_agent ON token_usage(agent_id, create
 CREATE INDEX IF NOT EXISTS idx_token_usage_task ON token_usage(task_id);
 CREATE INDEX IF NOT EXISTS idx_token_usage_date ON token_usage(created_at);
 CREATE INDEX IF NOT EXISTS idx_daily_metrics_date ON daily_metrics(date DESC, agent_id);
+CREATE INDEX IF NOT EXISTS idx_cost_alerts_entity ON cost_alert_configs(entity_type, entity_id);
 `;

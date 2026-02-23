@@ -8,6 +8,7 @@ import { CostTimeline } from './CostTimeline';
 import { TokenDistribution } from './TokenDistribution';
 import { AgentPerformance } from './AgentPerformance';
 import { MetricsFilter, type FilterState } from './MetricsFilter';
+import { CostAlertSettings } from './CostAlertSettings';
 
 interface MetricsDashboardProps {
   workspaceId?: string;
@@ -64,6 +65,9 @@ export function MetricsDashboard({ workspaceId }: MetricsDashboardProps) {
         endDate={filters.endDate}
         workspaceId={filters.workspaceId}
       />
+
+      {/* Cost Alert Settings */}
+      <CostAlertSettings workspaceId={workspaceId} />
     </div>
   );
 }
