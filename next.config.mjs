@@ -1,3 +1,5 @@
+import { withSentryConfig } from '@sentry/nextjs';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -36,4 +38,13 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+const sentryConfig = {
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  disableSourceMapUpload: !process.env.SENTRY_AUTH_TOKEN,
+};
+
+export default process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(nextConfig, sentryConfig)
+  : nextConfig;

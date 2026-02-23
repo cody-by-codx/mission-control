@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
+    "@sentry/nextjs": "^10.39.0",
     "@xyflow/react": "^12.10.1",
     "better-sqlite3": "^12.6.2",
     "clsx": "^2.1.1",
