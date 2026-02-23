@@ -306,7 +306,7 @@ export class OpenClawClient extends EventEmitter {
                     platform: process.platform || 'web',
                     mode: 'ui',
                   },
-                  auth: { token: this.token },
+                  auth: { token: this.token, password: this.token },
                   role,
                   scopes,
                   device,
@@ -444,6 +444,42 @@ export class OpenClawClient extends EventEmitter {
 
   async sendMessage(sessionId: string, content: string): Promise<void> {
     await this.call('sessions.send', { session_id: sessionId, content });
+
+    // Task 2.3: Record estimated token usage for sent messages
+    try {
+      const { estimateMessageTokens } = await import('../metrics/token-estimator');
+      const { recordTokenUsage } = await import('../metrics/cost-calculator');
+      const { queryOne } = await import('../db');
+
+      // Look up agent from session
+      const session = queryOne<{ agent_id: string; task_id: string | null }>(
+        'SELECT agent_id, task_id FROM openclaw_sessions WHERE openclaw_session_id = ? AND status = ?',
+        [sessionId, 'active']
+      );
+
+      if (session) {
+        const estimate = estimateMessageTokens(content);
+        // Determine model from agent record
+        const agent = queryOne<{ model: string | null }>(
+          'SELECT model FROM agents WHERE id = ?',
+          [session.agent_id]
+        );
+        const model = agent?.model || 'claude-sonnet-4-6';
+
+        recordTokenUsage({
+          agentId: session.agent_id,
+          taskId: session.task_id || undefined,
+          sessionId,
+          model,
+          inputTokens: estimate.inputTokens,
+          outputTokens: estimate.outputTokens,
+          operation: 'execution',
+        });
+      }
+    } catch (err) {
+      // Non-blocking: don't fail the message send if metrics fail
+      console.warn('[OpenClaw] Failed to record token usage:', err);
+    }
   }
 
   async createSession(channel: string, peer?: string): Promise<OpenClawSessionInfo> {
