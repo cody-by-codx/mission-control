@@ -12,6 +12,7 @@
  */
 
 import { getMissionControlUrl } from './config';
+import { apiLogger } from '@/lib/logger';
 
 const MISSION_CONTROL_URL = getMissionControlUrl();
 
@@ -56,12 +57,12 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`Failed to log activity: ${error}`);
+      apiLogger.error({ err: error }, 'Failed to log activity');
     } else {
-      console.log(`✓ Activity logged: ${params.message}`);
+      apiLogger.debug({ message: params.message }, 'Activity logged');
     }
   } catch (error) {
-    console.error('Error logging activity:', error);
+    apiLogger.error({ err: error }, 'Error logging activity');
   }
 }
 
@@ -84,12 +85,12 @@ export async function logDeliverable(params: LogDeliverableParams): Promise<void
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`Failed to log deliverable: ${error}`);
+      apiLogger.error({ err: error }, 'Failed to log deliverable');
     } else {
-      console.log(`✓ Deliverable logged: ${params.title}`);
+      apiLogger.debug({ title: params.title }, 'Deliverable logged');
     }
   } catch (error) {
-    console.error('Error logging deliverable:', error);
+    apiLogger.error({ err: error }, 'Error logging deliverable');
   }
 }
 
@@ -110,12 +111,12 @@ export async function registerSubAgentSession(params: RegisterSubAgentParams): P
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`Failed to register sub-agent session: ${error}`);
+      apiLogger.error({ err: error }, 'Failed to register sub-agent session');
     } else {
-      console.log(`✓ Sub-agent session registered: ${params.sessionId}`);
+      apiLogger.debug({ sessionId: params.sessionId }, 'Sub-agent session registered');
     }
   } catch (error) {
-    console.error('Error registering sub-agent session:', error);
+    apiLogger.error({ err: error }, 'Error registering sub-agent session');
   }
 }
 
@@ -136,12 +137,12 @@ export async function completeSubAgentSession(sessionId: string, summary?: strin
 
     if (!response.ok) {
       const error = await response.text();
-      console.error(`Failed to complete sub-agent session: ${error}`);
+      apiLogger.error({ err: error }, 'Failed to complete sub-agent session');
     } else {
-      console.log(`✓ Sub-agent session completed: ${sessionId}`);
+      apiLogger.debug({ sessionId }, 'Sub-agent session completed');
     }
   } catch (error) {
-    console.error('Error completing sub-agent session:', error);
+    apiLogger.error({ err: error }, 'Error completing sub-agent session');
   }
 }
 
@@ -156,7 +157,7 @@ export async function getDeliverables(taskId: string): Promise<any[]> {
     }
     return await response.json();
   } catch (error) {
-    console.error('Error fetching deliverables:', error);
+    apiLogger.error({ err: error }, 'Error fetching deliverables');
     return [];
   }
 }

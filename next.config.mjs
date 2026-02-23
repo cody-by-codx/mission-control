@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['better-sqlite3'],
+    serverComponentsExternalPackages: ['better-sqlite3', 'pino', 'pino-pretty'],
   },
   webpack: (config) => {
     config.externals.push({

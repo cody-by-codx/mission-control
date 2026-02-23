@@ -5,6 +5,7 @@
  */
 
 import type { SSEEvent } from './types';
+import { sseLogger } from '@/lib/logger';
 
 // Store active SSE client connections
 const clients = new Set<ReadableStreamDefaultController>();
@@ -52,12 +53,12 @@ function flushBatch(): void {
     try {
       client.enqueue(encoded);
     } catch (error) {
-      console.error('Failed to send SSE event to client:', error);
+      sseLogger.error({ err: error }, 'Failed to send SSE event to client');
       clients.delete(client);
     }
   }
 
-  console.log(`[SSE] Broadcast ${eventsToSend.length} event(s) to ${clients.size} client(s)`);
+  sseLogger.debug({ events: eventsToSend.length, clients: clients.size }, 'Broadcast events');
 }
 
 /**
