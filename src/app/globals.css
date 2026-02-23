@@ -135,3 +135,39 @@ body {
 .online-glow {
   box-shadow: 0 0 10px var(--mc-accent-green), 0 0 20px var(--mc-accent-green);
 }
+
+/* ===== Graph View Animations ===== */
+
+/* Agent node pulse when working */
+@keyframes agent-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 12px 4px rgba(16, 185, 129, 0.2); }
+}
+.agent-node-pulse {
+  animation: agent-pulse 2s ease-in-out infinite;
+}
+
+/* Task node glow when active (in_progress / planning) */
+@keyframes task-active-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3); }
+  50% { box-shadow: 0 0 10px 3px rgba(59, 130, 246, 0.15); }
+}
+.task-node-active {
+  animation: task-active-glow 2.5s ease-in-out infinite;
+}
+
+/* React Flow overrides for dark theme */
+.graph-view-container .react-flow__node {
+  cursor: pointer;
+}
+.graph-view-container .react-flow__edge-path {
+  cursor: pointer;
+}
+.graph-view-container .react-flow__minimap {
+  background-color: var(--mc-bg-secondary) !important;
+  border: 1px solid var(--mc-border) !important;
+  border-radius: 8px !important;
+}
+.graph-view-container .react-flow__controls {
+  display: none; /* We use our own controls */
+}

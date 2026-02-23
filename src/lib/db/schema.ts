@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS agents (
   model TEXT,
   source TEXT DEFAULT 'local',
   gateway_agent_id TEXT,
+  group_label TEXT,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -59,6 +60,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   planning_spec TEXT,
   planning_agents TEXT,
   planning_dispatch_error TEXT,
+  parent_task_id TEXT REFERENCES tasks(id),
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -171,6 +173,69 @@ CREATE TABLE IF NOT EXISTS task_deliverables (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
+-- Task dependencies (directed graph)
+CREATE TABLE IF NOT EXISTS task_dependencies (
+  id TEXT PRIMARY KEY,
+  source_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  target_task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  dependency_type TEXT DEFAULT 'blocks' CHECK (dependency_type IN ('blocks', 'relates_to', 'subtask_of')),
+  created_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(source_task_id, target_task_id)
+);
+
+-- Graph node positions (layout persistence)
+CREATE TABLE IF NOT EXISTS graph_node_positions (
+  id TEXT PRIMARY KEY,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id),
+  node_type TEXT NOT NULL CHECK (node_type IN ('agent', 'task', 'group')),
+  node_id TEXT NOT NULL,
+  x REAL NOT NULL DEFAULT 0,
+  y REAL NOT NULL DEFAULT 0,
+  pinned INTEGER DEFAULT 0,
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(workspace_id, node_type, node_id)
+);
+
+-- Token usage tracking
+CREATE TABLE IF NOT EXISTS token_usage (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL REFERENCES agents(id),
+  task_id TEXT REFERENCES tasks(id),
+  session_id TEXT,
+  model TEXT NOT NULL,
+  input_tokens INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  total_tokens INTEGER GENERATED ALWAYS AS (input_tokens + output_tokens) STORED,
+  cost_usd REAL NOT NULL DEFAULT 0.0,
+  operation TEXT NOT NULL CHECK (operation IN ('planning', 'execution', 'review', 'subagent', 'conversation')),
+  metadata TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Model pricing configuration
+CREATE TABLE IF NOT EXISTS model_pricing (
+  id TEXT PRIMARY KEY,
+  model_name TEXT NOT NULL UNIQUE,
+  input_price_per_1k REAL NOT NULL,
+  output_price_per_1k REAL NOT NULL,
+  provider TEXT NOT NULL DEFAULT 'anthropic',
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Daily aggregated metrics
+CREATE TABLE IF NOT EXISTS daily_metrics (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  agent_id TEXT REFERENCES agents(id),
+  workspace_id TEXT REFERENCES workspaces(id),
+  total_tokens INTEGER DEFAULT 0,
+  total_cost_usd REAL DEFAULT 0.0,
+  tasks_completed INTEGER DEFAULT 0,
+  avg_task_duration_ms INTEGER DEFAULT 0,
+  error_count INTEGER DEFAULT 0,
+  UNIQUE(date, agent_id)
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent_id);
@@ -183,4 +248,10 @@ CREATE INDEX IF NOT EXISTS idx_activities_task ON task_activities(task_id, creat
 CREATE INDEX IF NOT EXISTS idx_deliverables_task ON task_deliverables(task_id);
 CREATE INDEX IF NOT EXISTS idx_openclaw_sessions_task ON openclaw_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_planning_questions_task ON planning_questions(task_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_task_deps_source ON task_dependencies(source_task_id);
+CREATE INDEX IF NOT EXISTS idx_task_deps_target ON task_dependencies(target_task_id);
+CREATE INDEX IF NOT EXISTS idx_token_usage_agent ON token_usage(agent_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_token_usage_task ON token_usage(task_id);
+CREATE INDEX IF NOT EXISTS idx_token_usage_date ON token_usage(created_at);
+CREATE INDEX IF NOT EXISTS idx_daily_metrics_date ON daily_metrics(date DESC, agent_id);
 `;
