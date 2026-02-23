@@ -1,6 +1,10 @@
 // Task 2.6: GET /api/metrics/overview — global metrics summary
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
+import { startMetricsCron } from '@/lib/metrics/cron';
+
+// Start the daily aggregation cron on first API access
+startMetricsCron();
 
 export async function GET(request: NextRequest) {
   try {
