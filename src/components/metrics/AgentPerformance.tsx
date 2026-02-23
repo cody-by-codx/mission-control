@@ -132,9 +132,11 @@ export function AgentPerformance({ startDate, endDate, workspaceId }: AgentPerfo
                 borderRadius: '8px',
                 fontSize: '12px',
               }}
-              formatter={(value: number, name: string) => {
-                if (name.includes('Cost')) return [`$${value.toFixed(4)}`, name];
-                return [value.toLocaleString(), name];
+              formatter={(value, name) => {
+                const v = Number(value ?? 0);
+                const n = String(name ?? '');
+                if (n.includes('Cost')) return [`$${v.toFixed(4)}`, n];
+                return [v.toLocaleString(), n];
               }}
             />
             <Legend wrapperStyle={{ fontSize: '11px' }} />

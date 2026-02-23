@@ -126,10 +126,12 @@ export function CostTimeline({ startDate, endDate, workspaceId, agentId }: CostT
                 borderRadius: '8px',
                 fontSize: '12px',
               }}
-              labelFormatter={formatDate}
-              formatter={(value: number, name: string) => {
-                if (name.includes('cost')) return [`$${value.toFixed(4)}`, 'Cost'];
-                return [value.toLocaleString(), name];
+              labelFormatter={(label) => formatDate(String(label ?? ''))}
+              formatter={(value, name) => {
+                const v = Number(value ?? 0);
+                const n = String(name ?? '');
+                if (n.includes('cost')) return [`$${v.toFixed(4)}`, 'Cost'];
+                return [v.toLocaleString(), n];
               }}
             />
             <Legend wrapperStyle={{ fontSize: '11px' }} />

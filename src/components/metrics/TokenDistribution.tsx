@@ -107,10 +107,14 @@ export function TokenDistribution({ startDate, endDate, workspaceId }: TokenDist
                 borderRadius: '8px',
                 fontSize: '12px',
               }}
-              formatter={(value: number, _: string, props: { payload: { name: string; cost: number } }) => [
-                `${formatTokens(value)} tokens ($${props.payload.cost.toFixed(4)})`,
-                props.payload.name,
-              ]}
+              formatter={(value, _, props) => {
+                const v = Number(value ?? 0);
+                const p = (props as { payload?: { name?: string; cost?: number } })?.payload;
+                return [
+                  `${formatTokens(v)} tokens ($${(p?.cost ?? 0).toFixed(4)})`,
+                  p?.name ?? '',
+                ];
+              }}
             />
             <Legend
               wrapperStyle={{ fontSize: '11px' }}

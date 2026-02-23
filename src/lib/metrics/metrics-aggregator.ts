@@ -77,7 +77,7 @@ export function aggregateDaily(date: string): number {
     }
 
     // Also add entries for agents with completions but no token usage
-    for (const [agentId, completion] of completionMap) {
+    for (const [agentId, completion] of Array.from(completionMap.entries())) {
       if (!rows.some((r) => r.agent_id === agentId)) {
         const agent = queryOne<{ workspace_id: string }>(
           'SELECT workspace_id FROM agents WHERE id = ?',
