@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { createHmac } from 'crypto';
 import { queryOne, queryAll, run } from '@/lib/db';
+import { recordTokenUsage } from '@/lib/metrics/cost-calculator';
+import { estimateTokens } from '@/lib/metrics/token-estimator';
 import type { Task, Agent, OpenClawSession } from '@/lib/types';
 
 /**
@@ -109,6 +111,31 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Task 2.4: Record token usage from completion webhook
+      if (task.assigned_agent_id) {
+        try {
+          const agent = queryOne<{ model: string | null }>(
+            'SELECT model FROM agents WHERE id = ?',
+            [task.assigned_agent_id]
+          );
+          const model = body.model || agent?.model || 'claude-sonnet-4-6';
+          const inputTokens = body.input_tokens || estimateTokens(body.summary || '');
+          const outputTokens = body.output_tokens || estimateTokens(body.summary || '');
+
+          recordTokenUsage({
+            agentId: task.assigned_agent_id,
+            taskId: task.id,
+            model,
+            inputTokens,
+            outputTokens,
+            operation: 'execution',
+            metadata: { source: 'webhook', summary: body.summary },
+          });
+        } catch (err) {
+          console.warn('[WEBHOOK] Failed to record token usage:', err);
+        }
+      }
+
       return NextResponse.json({
         success: true,
         task_id: task.id,
@@ -190,6 +217,30 @@ export async function POST(request: NextRequest) {
         'UPDATE agents SET status = ?, updated_at = ? WHERE id = ?',
         ['standby', now, session.agent_id]
       );
+
+      // Task 2.4: Record token usage from session completion
+      try {
+        const agent = queryOne<{ model: string | null }>(
+          'SELECT model FROM agents WHERE id = ?',
+          [session.agent_id]
+        );
+        const model = body.model || agent?.model || 'claude-sonnet-4-6';
+        const inputTokens = body.input_tokens || estimateTokens(body.message || '');
+        const outputTokens = body.output_tokens || estimateTokens(summary);
+
+        recordTokenUsage({
+          agentId: session.agent_id,
+          taskId: task.id,
+          sessionId: body.session_id,
+          model,
+          inputTokens,
+          outputTokens,
+          operation: 'execution',
+          metadata: { source: 'webhook_session', summary },
+        });
+      } catch (err) {
+        console.warn('[WEBHOOK] Failed to record token usage:', err);
+      }
 
       return NextResponse.json({
         success: true,

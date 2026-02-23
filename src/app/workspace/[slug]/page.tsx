@@ -3,19 +3,20 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronLeft, LayoutGrid, GitBranch } from 'lucide-react';
+import { ChevronLeft, LayoutGrid, GitBranch, BarChart3 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { AgentsSidebar } from '@/components/AgentsSidebar';
 import { MissionQueue } from '@/components/MissionQueue';
 import { LiveFeed } from '@/components/LiveFeed';
 import { SSEDebugPanel } from '@/components/SSEDebugPanel';
 import { GraphView } from '@/components/graph/GraphView';
+import { MetricsDashboard } from '@/components/metrics/MetricsDashboard';
 import { useMissionControl } from '@/lib/store';
 import { useSSE } from '@/hooks/useSSE';
 import { debug } from '@/lib/debug';
 import type { Task, Workspace } from '@/lib/types';
 
-type ViewMode = 'kanban' | 'graph';
+type ViewMode = 'kanban' | 'graph' | 'metrics';
 
 export default function WorkspacePage() {
   const params = useParams();
@@ -246,6 +247,17 @@ export default function WorkspacePage() {
           <GitBranch className="w-3.5 h-3.5" />
           Graph
         </button>
+        <button
+          onClick={() => setViewMode('metrics')}
+          className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+            viewMode === 'metrics'
+              ? 'bg-mc-accent/20 text-mc-accent'
+              : 'text-mc-text-secondary hover:text-mc-text hover:bg-mc-bg-tertiary'
+          }`}
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          Metrics
+        </button>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -255,7 +267,7 @@ export default function WorkspacePage() {
         {/* Main Content Area */}
         {viewMode === 'kanban' ? (
           <MissionQueue workspaceId={workspace.id} />
-        ) : (
+        ) : viewMode === 'graph' ? (
           <div className="flex-1 overflow-hidden">
             <GraphView
               workspaceId={workspace.id}
@@ -263,6 +275,8 @@ export default function WorkspacePage() {
               onSelectAgent={handleGraphSelectAgent}
             />
           </div>
+        ) : (
+          <MetricsDashboard workspaceId={workspace.id} />
         )}
 
         {/* Live Feed */}
