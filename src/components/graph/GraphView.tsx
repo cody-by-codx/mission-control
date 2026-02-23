@@ -25,8 +25,10 @@ import { SubagentEdge } from './SubagentEdge';
 import { GraphControls } from './GraphControls';
 import { GraphMinimap } from './GraphMinimap';
 import { GraphContextMenu, type ContextMenuState } from './GraphContextMenu';
+import { GraphExport } from './GraphExport';
 import { useGraphData } from './useGraphData';
 import { useGraphLayout } from './useGraphLayout';
+import { useGraphShortcuts } from './useGraphShortcuts';
 import { useMissionControl } from '@/lib/store';
 import type { TaskDependency, OpenClawSession } from '@/lib/types';
 
@@ -174,6 +176,9 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
     setEdges(graphEdges);
     setTimeout(() => fitView({ padding: 0.2, duration: 300 }), 50);
   }, [graphNodes, graphEdges, applyLayout, setNodes, setEdges, fitView, viewMode, groupBy, applyTimelineLayout, applyGrouping]);
+
+  // Task 3.11: Keyboard shortcuts
+  useGraphShortcuts({ onAutoLayout: doAutoLayout });
 
   // Auto-layout on initial load and when graph structure changes
   useEffect(() => {
@@ -422,6 +427,7 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
         fitView
         minZoom={0.1}
         maxZoom={2}
+        onlyRenderVisibleElements={nodes.length > 100}
         proOptions={{ hideAttribution: true }}
         className="bg-mc-bg"
       >
@@ -433,6 +439,10 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
         />
         <GraphControls onAutoLayout={doAutoLayout} />
         <GraphMinimap />
+        {/* Task 3.10: Export controls */}
+        <div className="absolute bottom-4 right-4 z-10">
+          <GraphExport />
+        </div>
       </ReactFlow>
 
       {/* Context menu */}
