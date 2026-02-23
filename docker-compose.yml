@@ -15,13 +15,20 @@ services:
       DATABASE_PATH: /app/data/mission-control.db
       WORKSPACE_BASE_PATH: /app/workspace
       PROJECTS_PATH: /app/workspace/projects
+      LOG_LEVEL: info
+      RATE_LIMIT_RPM: "120"
       # Set this if OpenClaw runs on the host machine:
       # OPENCLAW_GATEWAY_URL: ws://host.docker.internal:18789
+      # Sentry (optional):
+      # SENTRY_DSN: https://xxx@sentry.io/yyy
+      # NEXT_PUBLIC_SENTRY_DSN: https://xxx@sentry.io/yyy
     volumes:
       - mission-control-data:/app/data
       - mission-control-workspace:/app/workspace
+      - mission-control-backups:/app/backups
     restart: unless-stopped
 
 volumes:
   mission-control-data:
   mission-control-workspace:
+  mission-control-backups:
