@@ -116,7 +116,9 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
     // Apply offset per group for visual separation
     let groupOffset = 0;
     const result: Node[] = [];
-    for (const [, groupNodes] of groups) {
+    const groupKeys = Array.from(groups.keys());
+    for (const key of groupKeys) {
+      const groupNodes = groups.get(key)!;
       for (const node of groupNodes) {
         result.push({
           ...node,
@@ -273,7 +275,7 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
   );
 
   // Task 3.4: Drag-to-connect for creating dependencies
-  const onConnectStart = useCallback((_: React.MouseEvent | React.TouchEvent, params: OnConnectStartParams) => {
+  const onConnectStart = useCallback((_event: unknown, params: OnConnectStartParams) => {
     connectingNodeRef.current = params;
   }, []);
 
@@ -335,11 +337,11 @@ function GraphViewInner({ workspaceId, onSelectTask, onSelectAgent }: GraphViewI
     });
   }, []);
 
-  const onPaneContextMenu = useCallback((event: React.MouseEvent) => {
+  const onPaneContextMenu = useCallback((event: MouseEvent | React.MouseEvent) => {
     event.preventDefault();
     setContextMenu({
-      x: event.clientX,
-      y: event.clientY,
+      x: (event as MouseEvent).clientX,
+      y: (event as MouseEvent).clientY,
       type: 'pane',
     });
   }, []);
