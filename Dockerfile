@@ -6,14 +6,14 @@ FROM base AS build-deps
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
+COPY package*.json yarn.lock* ./
 RUN npm ci
 
 FROM base AS prod-deps
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
-COPY package*.json ./
+COPY package*.json yarn.lock* ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 FROM base AS builder
@@ -28,10 +28,11 @@ ENV NODE_ENV=production \
   PORT=4000 \
   DATABASE_PATH=/app/data/mission-control.db \
   WORKSPACE_BASE_PATH=/app/workspace \
-  PROJECTS_PATH=/app/workspace/projects
+  PROJECTS_PATH=/app/workspace/projects \
+  LOG_LEVEL=info
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends dumb-init \
+  && apt-get install -y --no-install-recommends dumb-init sqlite3 \
   && rm -rf /var/lib/apt/lists/*
 
 COPY --from=prod-deps /app/node_modules ./node_modules
@@ -39,15 +40,19 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.mjs ./next.config.mjs
+COPY --from=builder /app/sentry.client.config.ts ./sentry.client.config.ts
+COPY --from=builder /app/sentry.server.config.ts ./sentry.server.config.ts
+COPY --from=builder /app/sentry.edge.config.ts ./sentry.edge.config.ts
+COPY scripts/db-backup.sh ./scripts/db-backup.sh
 
-RUN mkdir -p /app/data /app/workspace/projects \
+RUN mkdir -p /app/data /app/workspace/projects /app/backups \
   && chown -R node:node /app
 
 USER node
 EXPOSE 4000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:4000/api/events').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:4000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["npm", "run", "start"]

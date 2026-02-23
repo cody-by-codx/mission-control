@@ -41,13 +41,23 @@
 
 🔌 **OpenClaw Integration** — WebSocket connection to [OpenClaw Gateway](https://github.com/openclaw/openclaw) for AI agent orchestration
 
-🐳 **Docker Ready** — Production-optimized Dockerfile and docker-compose for easy deployment
+📊 **Graph View** — Interactive dependency graph visualization with React Flow, drag-to-connect, PNG/SVG export, and keyboard shortcuts
 
-🔒 **Security First** — Bearer token auth, HMAC webhooks, Zod validation, path traversal protection, security headers
+💰 **Cost Metrics** — Token usage tracking per agent/model, cost timeline charts, CSV/JSON export, and configurable cost alerts
 
-📡 **Live Feed** — Real-time event stream showing agent activity, task updates, and system events
+🐳 **Docker Ready** — Production-optimized multi-stage Dockerfile and docker-compose for easy deployment
+
+🔒 **Security First** — Bearer token auth, HMAC webhooks, Zod validation, rate limiting, path traversal protection, security headers
+
+📡 **Live Feed** — Real-time event stream (SSE) showing agent activity, task updates, and system events
+
+🔍 **Monitoring** — Health check endpoint (`/api/health`), monitoring dashboard (`/monitoring`), structured logging with pino
+
+🚨 **Error Tracking** — Sentry integration for client and server error tracking (optional, enabled via env var)
 
 🌐 **Multi-Machine** — Run the dashboard and AI agents on different computers (supports Tailscale for remote)
+
+🔄 **CI/CD** — GitHub Actions pipeline with lint, typecheck, unit tests, build verification, and Docker build
 
 ---
 
@@ -182,6 +192,7 @@ docker compose down -v
 Compose uses named volumes:
 - `mission-control-data` for SQLite (`/app/data`)
 - `mission-control-workspace` for workspace files (`/app/workspace`)
+- `mission-control-backups` for database backups (`/app/backups`)
 
 ---
 
@@ -224,6 +235,10 @@ Drag tasks between columns or let the system auto-advance them.
 | `DATABASE_PATH` | — | `./mission-control.db` | SQLite database location |
 | `WORKSPACE_BASE_PATH` | — | `~/Documents/Shared` | Base directory for workspace files |
 | `PROJECTS_PATH` | — | `~/Documents/Shared/projects` | Directory for project folders |
+| `LOG_LEVEL` | — | `debug` (dev) / `info` (prod) | Pino log level (trace/debug/info/warn/error) |
+| `RATE_LIMIT_RPM` | — | `120` | API rate limit (requests per minute per IP) |
+| `SENTRY_DSN` | — | — | Sentry DSN for server-side error tracking |
+| `NEXT_PUBLIC_SENTRY_DSN` | — | — | Sentry DSN for client-side error tracking |
 
 ### Security (Production)
 
@@ -282,7 +297,26 @@ rm mission-control.db
 
 # Inspect
 sqlite3 mission-control.db ".tables"
+
+# Backup (creates timestamped snapshot in /backups, keeps last 7)
+npm run db:backup
+
+# Restore from backup
+cp backups/mission-control_YYYYMMDD_HHMMSS.db mission-control.db
 ```
+
+---
+
+## 📊 Monitoring
+
+Mission Control includes built-in observability:
+
+- **Health Check** — `GET /api/health` returns uptime, database status, memory usage, and entity counts
+- **Monitoring Dashboard** — Visit `/monitoring` for a live system overview with auto-refresh
+- **Structured Logging** — JSON logs via [pino](https://getpino.io/) with log levels configurable via `LOG_LEVEL`
+- **Error Tracking** — Optional [Sentry](https://sentry.io/) integration (set `SENTRY_DSN` to enable)
+- **Rate Limiting** — Per-IP rate limiting on all API routes (configurable via `RATE_LIMIT_RPM`)
+- **Load Testing** — k6 script for baseline performance testing: `k6 run scripts/load-test.js`
 
 ---
 
@@ -295,23 +329,36 @@ mission-control/
 │   │   ├── api/
 │   │   │   ├── tasks/          # Task CRUD + planning + dispatch
 │   │   │   ├── agents/         # Agent management
+│   │   │   ├── metrics/        # Cost & usage analytics
+│   │   │   ├── health/         # Health check endpoint
 │   │   │   ├── openclaw/       # Gateway proxy endpoints
 │   │   │   └── webhooks/       # Agent completion webhooks
+│   │   ├── monitoring/         # Monitoring dashboard
+│   │   ├── metrics/            # Cost metrics page
 │   │   ├── settings/           # Settings page
 │   │   └── workspace/[slug]/   # Workspace dashboard
-│   ├── components/             # React components
+│   ├── components/
+│   │   ├── graph/              # Graph visualization (React Flow)
+│   │   ├── metrics/            # Cost dashboard charts (Recharts)
 │   │   ├── MissionQueue.tsx    # Kanban board
 │   │   ├── PlanningTab.tsx     # AI planning interface
 │   │   ├── AgentsSidebar.tsx   # Agent panel
 │   │   ├── LiveFeed.tsx        # Real-time events
 │   │   └── TaskModal.tsx       # Task create/edit
-│   └── lib/
-│       ├── db/                 # SQLite + migrations
-│       ├── openclaw/           # Gateway client + device identity
-│       ├── validation.ts       # Zod schemas
-│       └── types.ts            # TypeScript types
-├── scripts/                    # Bridge & hook scripts
-├── src/middleware.ts            # Auth middleware
+│   ├── lib/
+│   │   ├── db/                 # SQLite + migrations
+│   │   ├── metrics/            # Token estimation + cost calculation
+│   │   ├── openclaw/           # Gateway client + device identity
+│   │   ├── logger.ts           # Structured logging (pino)
+│   │   ├── rate-limit.ts       # Rate limiting utility
+│   │   ├── validation.ts       # Zod schemas
+│   │   └── types.ts            # TypeScript types
+│   └── middleware.ts            # Auth + rate limiting middleware
+├── scripts/
+│   ├── db-backup.sh            # SQLite backup with rotation
+│   └── load-test.js            # k6 load testing script
+├── .github/workflows/ci.yml    # CI/CD pipeline
+├── sentry.*.config.ts          # Sentry error tracking configs
 ├── .env.example                # Environment template
 └── CHANGELOG.md                # Version history
 ```

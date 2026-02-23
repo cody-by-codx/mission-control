@@ -3,6 +3,7 @@
 // Started automatically when the module is imported from a server component/route
 
 import { aggregateDaily } from './metrics-aggregator';
+import logger from '@/lib/logger';
 
 const CRON_GLOBAL_KEY = '__metrics_cron_timer__';
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
@@ -16,7 +17,7 @@ export function startMetricsCron(): void {
     return; // Already running
   }
 
-  console.log('[Metrics] Starting daily aggregation cron');
+  logger.info('Starting daily aggregation cron');
 
   // Run immediately for yesterday's data
   runAggregation();
@@ -33,8 +34,8 @@ function runAggregation(): void {
     const dateStr = yesterday.toISOString().split('T')[0];
 
     const count = aggregateDaily(dateStr);
-    console.log(`[Metrics] Daily aggregation complete: ${count} entries for ${dateStr}`);
+    logger.info({ count, date: dateStr }, 'Daily aggregation complete');
   } catch (err) {
-    console.error('[Metrics] Daily aggregation failed:', err);
+    logger.error({ err }, 'Daily aggregation failed');
   }
 }

@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { schema } from './schema';
 import { runMigrations } from './migrations';
+import { dbLogger } from '@/lib/logger';
 
 const DB_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'mission-control.db');
 
@@ -24,7 +25,7 @@ export function getDb(): Database.Database {
     runMigrations(db);
     
     if (isNewDb) {
-      console.log('[DB] New database created at:', DB_PATH);
+      dbLogger.info({ path: DB_PATH }, 'New database created');
     }
   }
   return db;
